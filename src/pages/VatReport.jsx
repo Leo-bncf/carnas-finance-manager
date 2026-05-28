@@ -19,6 +19,9 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
+import { Download } from "lucide-react";
+import * as XLSX from "xlsx";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { motion } from "framer-motion";
@@ -35,6 +38,7 @@ const VAT_RATES_LABELS = {
 export default function VatReport() {
   const currentYear = new Date().getFullYear();
   const [selectedYear, setSelectedYear] = useState(String(currentYear));
+  const [isExporting, setIsExporting] = useState(false);
 
   const { data: receipts = [], isLoading } = useQuery({
     queryKey: ["receipts"],
@@ -79,6 +83,75 @@ export default function VatReport() {
 
   const years = Array.from({ length: 5 }, (_, i) => String(currentYear - i));
 
+  const exportToExcel = () => {
+    if (filtered.length === 0) return;
+    setIsExporting(true);
+    try {
+      const vatLabel = (rate) => VAT_RATES_LABELS[rate] || `${rate}%`;
+      const n2 = (v) => Math.round((v || 0) * 100) / 100;
+      const MONEY = '#,##0.00" €"';
+
+      const sorted = [...filtered].sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+      const aoa = [];
+      const moneyCells = [];
+
+      // One row per receipt
+      aoa.push(["Date", "Fournisseur", "HT", "TVA %", "TVA", "TTC"]);
+      sorted.forEach((r) => {
+        aoa.push([
+          r.date || "",
+          r.vendor || "",
+          n2(r.amount_ht),
+          vatLabel(r.vat_rate || 0),
+          n2(r.vat_amount),
+          n2(r.amount_ttc),
+        ]);
+        const row = aoa.length;
+        moneyCells.push(`C${row}`, `E${row}`, `F${row}`);
+      });
+
+      // Breakdown by VAT rate (for the TVA return)
+      aoa.push([]);
+      aoa.push(["Répartition par taux de TVA"]);
+      aoa.push(["Taux", "Nb reçus", "Base HT", "TVA", "TTC"]);
+      Object.entries(vatSummary)
+        .sort(([a], [b]) => Number(a) - Number(b))
+        .forEach(([rate, data]) => {
+          aoa.push([vatLabel(Number(rate)), data.count, n2(data.ht), n2(data.vat), n2(data.ttc)]);
+          const row = aoa.length;
+          moneyCells.push(`C${row}`, `D${row}`, `E${row}`);
+        });
+
+      // Totals
+      aoa.push([]);
+      aoa.push(["TOTAUX"]);
+      aoa.push(["Total HT", n2(totalHT)]);
+      moneyCells.push(`B${aoa.length}`);
+      aoa.push(["Total TVA", n2(totalVAT)]);
+      moneyCells.push(`B${aoa.length}`);
+      aoa.push(["Total TTC", n2(totalTTC)]);
+      moneyCells.push(`B${aoa.length}`);
+      aoa.push(["Nombre de reçus", filtered.length]);
+      aoa.push([]);
+      aoa.push([`Année ${selectedYear} — reçus rejetés exclus. Montants en euros.`]);
+
+      const ws = XLSX.utils.aoa_to_sheet(aoa);
+      ws["!cols"] = [{ wch: 12 }, { wch: 26 }, { wch: 12 }, { wch: 8 }, { wch: 12 }, { wch: 12 }];
+      moneyCells.forEach((addr) => {
+        if (ws[addr]) ws[addr].z = MONEY;
+      });
+      ws["!autofilter"] = { ref: `A1:F${sorted.length + 1}` };
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, `TVA ${selectedYear}`);
+      XLSX.writeFile(wb, `rapport_tva_${selectedYear}.xlsx`);
+    } catch (e) {
+      console.error("Export failed:", e);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="space-y-6">
@@ -97,18 +170,28 @@ export default function VatReport() {
             Synthèse de la TVA déductible — Carnas France
           </p>
         </div>
-        <Select value={selectedYear} onValueChange={setSelectedYear}>
-          <SelectTrigger className="w-32">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {years.map((y) => (
-              <SelectItem key={y} value={y}>
-                {y}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="flex items-center gap-2">
+          <Select value={selectedYear} onValueChange={setSelectedYear}>
+            <SelectTrigger className="w-32">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {years.map((y) => (
+                <SelectItem key={y} value={y}>
+                  {y}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            onClick={exportToExcel}
+            disabled={isExporting || filtered.length === 0}
+            className="gap-2"
+          >
+            <Download className="w-4 h-4" />
+            {isExporting ? "Export..." : "Exporter Excel"}
+          </Button>
+        </div>
       </div>
 
       {/* Summary Cards */}
