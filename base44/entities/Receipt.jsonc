@@ -1,0 +1,91 @@
+{
+  "name": "Receipt",
+  "type": "object",
+  "properties": {
+    "vendor": {
+      "type": "string",
+      "description": "Nom du fournisseur"
+    },
+    "description": {
+      "type": "string",
+      "description": "Description de la d\u00e9pense"
+    },
+    "date": {
+      "type": "string",
+      "format": "date",
+      "description": "Date du re\u00e7u"
+    },
+    "amount_ht": {
+      "type": "number",
+      "description": "Montant hors taxes"
+    },
+    "vat_rate": {
+      "type": "number",
+      "description": "Taux de TVA en pourcentage"
+    },
+    "vat_amount": {
+      "type": "number",
+      "description": "Montant de la TVA"
+    },
+    "amount_ttc": {
+      "type": "number",
+      "description": "Montant toutes taxes comprises"
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "fournitures",
+        "transport",
+        "services",
+        "restauration",
+        "logement",
+        "telecommunication",
+        "assurance",
+        "marketing",
+        "entretien",
+        "energie",
+        "autres"
+      ],
+      "description": "Cat\u00e9gorie de d\u00e9pense"
+    },
+    "payment_method": {
+      "type": "string",
+      "enum": [
+        "carte_bancaire",
+        "especes",
+        "virement",
+        "cheque",
+        "prelevement"
+      ],
+      "description": "Mode de paiement"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "en_attente",
+        "valide",
+        "rejete",
+        "archive"
+      ],
+      "default": "en_attente",
+      "description": "Statut du re\u00e7u"
+    },
+    "file_url": {
+      "type": "string",
+      "description": "URL du fichier re\u00e7u upload\u00e9"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Notes additionnelles"
+    },
+    "invoice_number": {
+      "type": "string",
+      "description": "Num\u00e9ro de facture"
+    }
+  },
+  "required": [
+    "vendor",
+    "date",
+    "amount_ttc"
+  ]
+}
