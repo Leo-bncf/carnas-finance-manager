@@ -18,7 +18,7 @@ import { motion, AnimatePresence } from "framer-motion";
 const navItems = [
   { path: "/", label: "Tableau de bord", icon: LayoutDashboard },
   { path: "/receipts", label: "Reçus", icon: Receipt },
-  { path: "/add-receipt", label: "Ajouter un reçu", icon: PlusCircle },
+  { path: "/add-receipt", label: "Importer des tickets", icon: PlusCircle },
   { path: "/vat-report", label: "Rapport TVA", icon: BarChart3 },
   { path: "/settings", label: "Paramètres", icon: Settings },
 ];
