@@ -71,12 +71,15 @@ export default function VatReport() {
 
   const { data: receipts = [], isLoading } = useQuery({
     queryKey: ["receipts"],
-    queryFn: () => base44.entities.Receipt.list("-date", 500),
+    queryFn: () => base44.entities.Receipt.list("-date", 5000),
   });
 
-  const filtered = receipts.filter(
-    (r) => r.date && r.date.startsWith(selectedYear) && r.status !== "rejete"
-  );
+  const isAllYears = selectedYear === "all";
+  const filtered = receipts.filter((r) => {
+    if (r.status === "rejete") return false;
+    if (isAllYears) return true;
+    return r.date && r.date.startsWith(selectedYear);
+  });
 
   // Summary by VAT rate
   const vatSummary = {};
@@ -98,13 +101,15 @@ export default function VatReport() {
     monthlyVat[month] += r.vat_amount || 0;
   });
 
-  const monthlyData = Array.from({ length: 12 }, (_, i) => {
-    const m = `${selectedYear}-${String(i + 1).padStart(2, "0")}`;
-    return {
-      month: format(new Date(parseInt(selectedYear), i, 1), "MMM", { locale: fr }),
-      TVA: Math.round((monthlyVat[m] || 0) * 100) / 100,
-    };
-  });
+  const monthlyData = isAllYears
+    ? []
+    : Array.from({ length: 12 }, (_, i) => {
+        const m = `${selectedYear}-${String(i + 1).padStart(2, "0")}`;
+        return {
+          month: format(new Date(parseInt(selectedYear), i, 1), "MMM", { locale: fr }),
+          TVA: Math.round((monthlyVat[m] || 0) * 100) / 100,
+        };
+      });
 
   const totalHT = filtered.reduce((s, r) => s + (r.amount_ht || 0), 0);
   const totalVAT = filtered.reduce((s, r) => s + (r.vat_amount || 0), 0);
@@ -181,7 +186,9 @@ export default function VatReport() {
       moneyCells.push(`B${aoa.length}`);
       aoa.push(["Nombre de reçus", filtered.length]);
       aoa.push([]);
-      aoa.push([`Année ${selectedYear} — reçus rejetés exclus. Montants en euros.`]);
+      aoa.push([
+        `${isAllYears ? "Toutes les années" : `Année ${selectedYear}`} — reçus rejetés exclus. Montants en euros.`,
+      ]);
 
       const ws = XLSX.utils.aoa_to_sheet(aoa);
       ws["!cols"] = [
@@ -194,8 +201,10 @@ export default function VatReport() {
       ws["!autofilter"] = { ref: `A1:L${sorted.length + 1}` };
 
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, `TVA ${selectedYear}`);
-      XLSX.writeFile(wb, `rapport_tva_${selectedYear}.xlsx`);
+      const periodSlug = isAllYears ? "toutes_annees" : selectedYear;
+      const sheetName = isAllYears ? "TVA toutes annees" : `TVA ${selectedYear}`;
+      XLSX.utils.book_append_sheet(wb, ws, sheetName);
+      XLSX.writeFile(wb, `rapport_tva_${periodSlug}.xlsx`);
     } catch (e) {
       console.error("Export failed:", e);
     } finally {
@@ -223,10 +232,11 @@ export default function VatReport() {
         </div>
         <div className="flex items-center gap-2">
           <Select value={selectedYear} onValueChange={setSelectedYear}>
-            <SelectTrigger className="w-32">
+            <SelectTrigger className="w-48">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="all">Toutes les années</SelectItem>
               {years.map((y) => (
                 <SelectItem key={y} value={y}>
                   {y}
@@ -269,7 +279,8 @@ export default function VatReport() {
         </Card>
       </div>
 
-      {/* Monthly Chart */}
+      {/* Monthly Chart — hidden when "Toutes les années" is selected */}
+      {!isAllYears && (
       <Card className="shadow-sm">
         <CardHeader>
           <CardTitle className="text-lg font-semibold">TVA mensuelle {selectedYear}</CardTitle>
@@ -305,6 +316,7 @@ export default function VatReport() {
           </div>
         </CardContent>
       </Card>
+      )}
 
       {/* VAT Rate Breakdown */}
       <Card className="shadow-sm overflow-hidden">
@@ -347,7 +359,7 @@ export default function VatReport() {
               {Object.keys(vatSummary).length === 0 && (
                 <TableRow>
                   <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                    Aucune donnée pour {selectedYear}
+                    Aucune donnée pour {isAllYears ? "cette période" : selectedYear}
                   </TableCell>
                 </TableRow>
               )}
