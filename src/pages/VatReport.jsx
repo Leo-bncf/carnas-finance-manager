@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -115,7 +115,14 @@ export default function VatReport() {
   const totalVAT = filtered.reduce((s, r) => s + (r.vat_amount || 0), 0);
   const totalTTC = filtered.reduce((s, r) => s + (r.amount_ttc || 0), 0);
 
-  const years = Array.from({ length: currentYear - 2006 + 1 }, (_, i) => String(currentYear - i));
+  // Show only years that actually have receipts (sorted most recent first).
+  const years = useMemo(() => {
+    const set = new Set();
+    receipts.forEach((r) => {
+      if (r.date && /^\d{4}/.test(r.date)) set.add(r.date.slice(0, 4));
+    });
+    return Array.from(set).sort().reverse();
+  }, [receipts]);
 
   const exportToExcel = () => {
     if (filtered.length === 0) return;
