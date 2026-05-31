@@ -35,6 +35,35 @@ const VAT_RATES_LABELS = {
   20: "20%",
 };
 
+const CATEGORY_LABELS = {
+  fournitures: "Fournitures",
+  transport: "Transport",
+  services: "Services",
+  restauration: "Restauration",
+  logement: "Logement",
+  telecommunication: "Télécommunication",
+  assurance: "Assurance",
+  marketing: "Marketing",
+  entretien: "Entretien",
+  energie: "Énergie",
+  autres: "Autres",
+};
+
+const PAYMENT_METHOD_LABELS = {
+  carte_bancaire: "Carte bancaire",
+  especes: "Espèces",
+  virement: "Virement",
+  cheque: "Chèque",
+  prelevement: "Prélèvement",
+};
+
+const STATUS_LABELS = {
+  en_attente: "En attente",
+  valide: "Validé",
+  rejete: "Rejeté",
+  archive: "Archivé",
+};
+
 export default function VatReport() {
   const currentYear = new Date().getFullYear();
   const [selectedYear, setSelectedYear] = useState(String(currentYear));
@@ -81,7 +110,7 @@ export default function VatReport() {
   const totalVAT = filtered.reduce((s, r) => s + (r.vat_amount || 0), 0);
   const totalTTC = filtered.reduce((s, r) => s + (r.amount_ttc || 0), 0);
 
-  const years = Array.from({ length: 5 }, (_, i) => String(currentYear - i));
+  const years = Array.from({ length: currentYear - 2006 + 1 }, (_, i) => String(currentYear - i));
 
   const exportToExcel = () => {
     if (filtered.length === 0) return;
@@ -95,19 +124,38 @@ export default function VatReport() {
       const aoa = [];
       const moneyCells = [];
 
-      // One row per receipt
-      aoa.push(["Date", "Fournisseur", "HT", "TVA %", "TVA", "TTC"]);
+      // One row per receipt (full detail)
+      aoa.push([
+        "Date",
+        "Fournisseur",
+        "N° facture",
+        "Catégorie",
+        "Description",
+        "HT",
+        "TVA %",
+        "TVA",
+        "TTC",
+        "Mode de paiement",
+        "Statut",
+        "Notes",
+      ]);
       sorted.forEach((r) => {
         aoa.push([
           r.date || "",
           r.vendor || "",
+          r.invoice_number || "",
+          CATEGORY_LABELS[r.category] || r.category || "",
+          r.description || "",
           n2(r.amount_ht),
           vatLabel(r.vat_rate || 0),
           n2(r.vat_amount),
           n2(r.amount_ttc),
+          PAYMENT_METHOD_LABELS[r.payment_method] || r.payment_method || "",
+          STATUS_LABELS[r.status] || r.status || "",
+          r.notes || "",
         ]);
         const row = aoa.length;
-        moneyCells.push(`C${row}`, `E${row}`, `F${row}`);
+        moneyCells.push(`F${row}`, `H${row}`, `I${row}`);
       });
 
       // Breakdown by VAT rate (for the TVA return)
@@ -136,11 +184,14 @@ export default function VatReport() {
       aoa.push([`Année ${selectedYear} — reçus rejetés exclus. Montants en euros.`]);
 
       const ws = XLSX.utils.aoa_to_sheet(aoa);
-      ws["!cols"] = [{ wch: 12 }, { wch: 26 }, { wch: 12 }, { wch: 8 }, { wch: 12 }, { wch: 12 }];
+      ws["!cols"] = [
+        { wch: 12 }, { wch: 26 }, { wch: 14 }, { wch: 16 }, { wch: 30 }, { wch: 12 },
+        { wch: 8 }, { wch: 12 }, { wch: 12 }, { wch: 18 }, { wch: 12 }, { wch: 32 },
+      ];
       moneyCells.forEach((addr) => {
         if (ws[addr]) ws[addr].z = MONEY;
       });
-      ws["!autofilter"] = { ref: `A1:F${sorted.length + 1}` };
+      ws["!autofilter"] = { ref: `A1:L${sorted.length + 1}` };
 
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, `TVA ${selectedYear}`);
